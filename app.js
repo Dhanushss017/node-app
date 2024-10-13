@@ -33,25 +33,44 @@ const User = mongoose.model('User', userSchema);
 app.post('/signup', async (req, res) => {
   const { username, email, phone, profession, password } = req.body;
 
+  // Check if all fields are provided
   if (!username || !email || !phone || !profession || !password) {
     return res.status(400).json({ error: 'All fields are required' });
   }
 
-  const existingUser = await User.findOne({ email });
-  if (existingUser) {
-    return res.status(400).json({ error: 'Email already exists' });
-  }
-
   try {
-    const hashedPassword = await bcrypt.hash(password, 10);
-    const newUser = new User({ username, email, phone, profession, password: hashedPassword });
-    await newUser.save();
+    // Check if email, username, or phone already exist in the database
+    const existingUserByEmail = await User.findOne({ email });
+    const existingUserByUsername = await User.findOne({ username });
+    const existingUserByPhone = await User.findOne({ phone });
 
+    if (existingUserByEmail) {
+      return res.status(400).json({ error: 'Email already exists' });
+    }
+    if (existingUserByUsername) {
+      return res.status(400).json({ error: 'Username already exists' });
+    }
+    if (existingUserByPhone) {
+      return res.status(400).json({ error: 'Phone number already exists' });
+    }
+
+    // Hash the password and create a new user
+    const hashedPassword = await bcrypt.hash(password, 10);
+    const newUser = new User({
+      username,
+      email,
+      phone,
+      profession,
+      password: hashedPassword
+    });
+    
+    await newUser.save();
     res.status(201).json({ message: 'User created successfully' });
   } catch (err) {
     res.status(500).json({ error: 'Error creating user' });
   }
 });
+
 
 // Login route
 app.post('/login', async (req, res) => {
@@ -72,9 +91,9 @@ app.post('/login', async (req, res) => {
   res.status(200).json({ message: 'Login successful', token });
 });
 
-// Get all users with pagination
+
 app.get('/users', async (req, res) => {
-  const { page = 1, limit = 10 } = req.query;
+  const { page = 1, limit = 15 } = req.query;
 
   try {
     const users = await User.find()
@@ -94,7 +113,7 @@ app.get('/users', async (req, res) => {
 const movieSchema = new mongoose.Schema({}, { collection: 'movies' });
 const Movie = mongoose.model('Movie', movieSchema);
 
-// GET route to fetch movies from the 'movies' collection
+
 app.get('/movies', async (req, res) => {
   try {
     const movies = await Movie.find().limit(10);
@@ -103,7 +122,20 @@ app.get('/movies', async (req, res) => {
     res.status(500).send(err);
   }
 });
-// Patch route to update username and/or password
+app.get('/movies/:id', async (req, res) => {
+  try {
+    const movie = await Movie.findById(req.params.id);
+    
+    if (!movie) {
+      return res.status(404).json({ error: 'Movie not found' });
+    }
+
+    res.json(movie);
+  } catch (err) {
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
 app.patch('/users/:id', async (req, res) => {
   const { username, password } = req.body;
   const { id } = req.params;
